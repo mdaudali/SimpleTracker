@@ -24,7 +24,7 @@ fn main() -> Result<()> {
             change: performance_indicators.percentage_change,
             min: performance_indicators.min,
             max: performance_indicators.max,
-            thirty_day_average: performance_indicators.n_window_sma.map(|sma| sma[sma.len() - 1])
+            thirty_day_average: performance_indicators.n_window_sma.and_then(|sma| sma.last().map(|e| *e))
     })
 }).collect::<Result<Vec<output::Fields>>>()?;
 
