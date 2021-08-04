@@ -1,34 +1,35 @@
-use yahoo_finance_api as yahoo;
-use clap::{App, Arg};
-use chrono::{Utc, DateTime};
+use yahoo_finance_api::YahooConnector;
+use chrono;
 mod config;
+mod performance_indicators;
+mod output;
+mod ticker;
+mod price;
+mod percentage;
+use anyhow::Result;
+fn main() -> Result<()> {
+    let config = config::Config::new()?;
 
-fn main() {
-    let arg_matcher = App::new("SimpleTracker")
-        .version("0.0.1")
-        .arg(
-            Arg::with_name("ticker")
-                .short("t")
-                .long("ticker")
-                .value_name("TICKER")
-                .help("Loads the stock data for the provided ticker")
-                .required(true)
-        )
-        .arg(Arg::with_name("from")
-            .short("f")
-            .long("from")
-            .value_name("FROM")
-            .help("Start date to load data from")
-            ).get_matches();
-    let config = ConfigMatches {
-        ticker: Ticker::from_str(arg_matcher.value_of("ticker").unwrap()).unwrap(),
-        from: DateTime::parse_from_rfc2822(arg_matcher.value_of("from").unwrap()).unwrap().with_timezone(&Utc)
-    };
+    let provider = YahooConnector::new();
+    
+    let output_fields: Vec<output::Fields> = config.tickers.iter().map(|ticker| {
+        let series = provider.get_quote_history(&ticker.0, config.from, chrono::offset::Utc::now())?;
+        let quotes = series.quotes()?;
+        let series: Vec<f64> = quotes.iter().map(|q| q.adjclose).collect();
+        let performance_indicators = performance_indicators::PerformanceIndicators::create(30, &series[..]);
+        Ok(output::Fields {
+            period_start: config.from,
+            symbol: ticker.clone(),
+            price: price::Price(series[series.len() - 1]),
+            change: performance_indicators.percentage_change,
+            min: performance_indicators.min,
+            max: performance_indicators.max,
+            thirty_day_average: match performance_indicators.n_window_sma {
+                Some(sma) => Some(sma[sma.len() - 1]),
+                None => None
+        }})
+    }).collect::<Result<Vec<output::Fields>>>()?;
 
-    println!("Config: {:?}", config);
-
-    let provider = yahoo::YahooConnector::new();
-    println!("Quotes: {:?}", provider.get_latest_quotes("AAPL", "1m"));
+    output::to_csv(&output_fields, Box::new(std::io::stdout()))
+    
 }
-
-

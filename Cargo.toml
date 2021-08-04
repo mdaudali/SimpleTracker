@@ -11,4 +11,8 @@ yahoo_finance_api = {"version" = "1.2.2", features = ["blocking"]}
 clap = "2.33.3"
 strum = "0.21.0"
 strum_macros = "0.21"
-chrono = "0.4"
+chrono = {version = "0.4", features = ["serde"] }
+thiserror = "1.0"
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"]}
+csv = "1.1"
