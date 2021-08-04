@@ -1,6 +1,5 @@
 use chrono::{DateTime, Utc};
 use clap::{App, Arg};
-use std::str::FromStr;
 use anyhow::{Result, anyhow};
 use thiserror::Error;
 use crate::ticker::Ticker;

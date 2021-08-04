@@ -1,12 +1,12 @@
 use yahoo_finance_api::YahooConnector;
-use chrono;
+use anyhow::Result;
+
 mod config;
 mod performance_indicators;
 mod output;
 mod ticker;
 mod price;
 mod percentage;
-use anyhow::Result;
 fn main() -> Result<()> {
     let config = config::Config::new()?;
 
@@ -24,11 +24,9 @@ fn main() -> Result<()> {
             change: performance_indicators.percentage_change,
             min: performance_indicators.min,
             max: performance_indicators.max,
-            thirty_day_average: match performance_indicators.n_window_sma {
-                Some(sma) => Some(sma[sma.len() - 1]),
-                None => None
-        }})
-    }).collect::<Result<Vec<output::Fields>>>()?;
+            thirty_day_average: performance_indicators.n_window_sma.map(|sma| sma[sma.len() - 1])
+    })
+}).collect::<Result<Vec<output::Fields>>>()?;
 
     output::to_csv(&output_fields, Box::new(std::io::stdout()))
     

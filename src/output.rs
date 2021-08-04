@@ -19,6 +19,6 @@ pub struct Fields {
 
 pub fn to_csv(fields: &[Fields], output: Box<dyn Write>) -> Result<()> {
     let mut wtr = Writer::from_writer(output);
-    fields.iter().map(|field| wtr.serialize(field).map_err(|err| anyhow!(err))).collect::<Result<()>>()?;
+    fields.iter().try_for_each(|field| wtr.serialize(field).map_err(|err| anyhow!(err)))?;
     Ok(())
 }
