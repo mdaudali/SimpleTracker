@@ -10,7 +10,7 @@ use crate::price::Price;
 pub struct Fields {
     pub period_start: DateTime<Utc>,
     pub symbol: Ticker,
-    pub price: Price,
+    pub price: Option<Price>,
     pub change: Option<Percentage>,
     pub min: Option<Price>,
     pub max: Option<Price>,

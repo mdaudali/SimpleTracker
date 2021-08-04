@@ -20,7 +20,7 @@ fn main() -> Result<()> {
         Ok(output::Fields {
             period_start: config.from,
             symbol: ticker.clone(),
-            price: price::Price(series[series.len() - 1]),
+            price: series.last().map(|e| price::Price(*e)),
             change: performance_indicators.percentage_change,
             min: performance_indicators.min,
             max: performance_indicators.max,

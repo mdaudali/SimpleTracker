@@ -21,7 +21,7 @@ fn get_extreme(series: &[f64], comparator: fn(&f64, &f64) -> bool) -> Option<f64
     if series.is_empty() {
         None
     } else {
-        let mut min_value = &series[0];
+        let mut min_value = series.first()?;
         for value in series.iter() {
             if comparator(value, min_value) {
                 min_value = value;
@@ -56,8 +56,8 @@ pub fn price_diff(series: &[f64]) -> Option<(f64, f64)> {
         return None;
     }
 
-    let first = series[0];
-    let second = series[series.len() - 1];
+    let first = series.first()?;
+    let second = series.last()?;
 
     Some(((second / first) * 100_f64, second - first))
 }
