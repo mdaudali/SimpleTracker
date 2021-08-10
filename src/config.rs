@@ -10,7 +10,7 @@ pub enum ArgumentParsingError {
     MissingParameter(&'static str),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Config {
     pub tickers: Vec<Ticker>,
     pub from: DateTime<Utc>
