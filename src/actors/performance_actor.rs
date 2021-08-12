@@ -3,6 +3,7 @@ use crate::formatter::{Percentage, Price};
 use crate::ticker::Ticker;
 use async_trait::async_trait;
 use chrono::prelude::*;
+use log::error;
 use serde::Serialize;
 use xactor::{message, Actor, Addr, Context, Handler};
 #[message]
@@ -42,12 +43,12 @@ impl<T: Handler<Output<PerformanceIndicators>>> Actor for PerformanceActor<T> {}
 
 #[async_trait]
 impl<T: Handler<Output<PerformanceIndicators>>> Handler<PerformanceData> for PerformanceActor<T> {
-    // TODO: Make result type, since we don't want to drop performance data
-    // TODO: Remove all the unwraps.
     async fn handle(&mut self, _ctx: &mut Context<Self>, msg: PerformanceData) -> () {
         let performance_indicators =
             PerformanceIndicators::create(msg.window, &msg.performance_data, msg.ticker, msg.to);
-        self.addr.send(Output::of(performance_indicators)).unwrap();
+        if let Err(e) = self.addr.send(Output::of(performance_indicators)) {
+            error!("Failed to send performance indicators: {:?}", e);
+        }
     }
 }
 

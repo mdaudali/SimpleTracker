@@ -4,9 +4,11 @@ use anyhow::Result;
 use async_trait::async_trait;
 use chrono::prelude::*;
 use futures::{stream, stream::StreamExt};
+use log::error;
 use std::time::Duration;
 use xactor::{message, Actor, Addr, Context, Handler};
 use yahoo_finance_api::{YResponse, YahooConnector, YahooError};
+
 #[message]
 #[derive(Clone)]
 pub struct Fetch {
@@ -62,14 +64,22 @@ impl<T: YahooFinanceApi + Send + Sync + 'static, H: Handler<PerformanceData>> Ha
         let sender = &self.sender;
         stream::iter(self.tickers.clone())
             .for_each_concurrent(None, |ticker| async move {
-                let response = provider
+                let quotes = match provider
                     .get_quote_history(&ticker.0, from, to)
                     .await
-                    .unwrap();
-                let quotes = response.quotes().unwrap();
+                    .and_then(|x| x.quotes())
+                {
+                    Err(e) => {
+                        error!("Failed to retrieve quotes for {:?}: {:?}", ticker, e);
+                        return;
+                    }
+                    Ok(o) => o,
+                };
                 let series: Vec<f64> = quotes.iter().map(|q| q.adjclose).collect();
                 let performance_data = PerformanceData::of(ticker, 30, series, to);
-                sender.send(performance_data).unwrap();
+                if let Err(e) = sender.send(performance_data) {
+                    error!("Failed to send quotes to actor: {:?}", e)
+                }
             })
             .await;
     }

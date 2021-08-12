@@ -1,6 +1,8 @@
 use async_trait::async_trait;
+use log::error;
 use serde::Serialize;
 use std::io::Write;
+use std::time::Duration;
 use xactor::{Actor, Context, Handler, Message};
 
 pub struct Output<T: Serialize>(T);
@@ -35,9 +37,15 @@ impl<W: Write + Send + 'static> Actor for OutputActor<W> {}
 impl<T: Serialize + Send + 'static, W: Write + Send + 'static> Handler<Output<T>>
     for OutputActor<W>
 {
-    async fn handle(&mut self, _ctx: &mut Context<Self>, msg: Output<T>) -> () {
-        self.csv_writer.serialize(msg.to_inner()).unwrap();
-        self.csv_writer.flush().unwrap();
+    async fn handle(&mut self, ctx: &mut Context<Self>, msg: Output<T>) -> () {
+        if let Err(e) = self.csv_writer.serialize(msg.to_inner()) {
+            error!(
+                "Failed to serialize data for msg: {:?}. Retrying in 5 seconds",
+                e
+            );
+            ctx.send_later(msg, Duration::from_secs(5));
+        };
+        let _ = self.csv_writer.flush();
     }
 }
 

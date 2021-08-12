@@ -29,8 +29,7 @@ async fn main() -> Result<()> {
 
     fetch_actor_addr
         .call(actors::fetch_actor::Fetch::new())
-        .await
-        .unwrap();
+        .await?;
     output_actor_addr.wait_for_stop().await;
     Ok(())
 }

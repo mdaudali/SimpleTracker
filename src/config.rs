@@ -2,10 +2,7 @@ use crate::ticker::Ticker;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use clap::{App, Arg};
-use std::{
-    fs::File,
-    io::{BufReader, Read},
-};
+use std::fs::read_to_string;
 use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum ArgumentParsingError {
@@ -66,10 +63,7 @@ impl Config {
                 Ok(tickers.into_iter().map(String::from).map(Ticker).collect())
             }
             (None, Some(tickerfile)) => {
-                let file = File::open(tickerfile).unwrap();
-                let mut reader = BufReader::new(file);
-                let mut tickers = String::new();
-                reader.read_to_string(&mut tickers)?;
+                let tickers = read_to_string(tickerfile)?;
                 Ok(tickers.split(',').map(String::from).map(Ticker).collect())
             }
             (Some(_), Some(_)) => Err(anyhow!(ArgumentParsingError::TooManyParameters(
@@ -77,7 +71,6 @@ impl Config {
                 "Ticker-File"
             ))),
         }?;
-        println!("{:?}", tickers);
         let from_value = arg_matcher
             .value_of("from")
             .ok_or(ArgumentParsingError::MissingParameter("From"))?;
