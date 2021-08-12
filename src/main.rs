@@ -5,10 +5,10 @@ mod config;
 mod formatter;
 mod ticker;
 
-// fn main() {}
 
 #[async_std::main]
 async fn main() -> Result<()> {
+    env_logger::init();
     let config = config::Config::new()?;
 
     let output_actor = actors::output_actor::OutputActor::of(std::io::stdout());
