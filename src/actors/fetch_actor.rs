@@ -160,8 +160,11 @@ mod tests {
             YResponse::from_json(u)
         }
     }
-    #[async_std::test]
-    async fn fetch_actor_returns_quotes_from_initial_time_to_now() {
+
+    async fn create_buf_and_actors_and_call_actor_with(
+        tickers: Vec<Ticker>,
+        fetch: Fetch,
+    ) -> Vec<PerformanceData> {
         let buf = Arc::new(Mutex::new(vec![]));
         let mock_performance_data_actor = MockPerformanceDataActor::of(buf.clone());
         let mut mock_performance_data_actor_addr =
@@ -171,13 +174,12 @@ mod tests {
         let fetch_actor = FetchActor::of(
             mock_performance_data_actor_addr.clone(),
             mock_yahoo_api,
-            vec![Ticker("test".to_string())],
+            tickers,
             Utc::now(),
         );
         let mut fetch_actor_addr = fetch_actor.start().await.unwrap();
 
-        let to = Utc::now();
-        fetch_actor_addr.call(Fetch::of(to)).await.unwrap();
+        fetch_actor_addr.call(fetch).await.unwrap();
 
         fetch_actor_addr.stop(None).unwrap();
         mock_performance_data_actor_addr.stop(None).unwrap();
@@ -185,11 +187,31 @@ mod tests {
         fetch_actor_addr.wait_for_stop().await;
         mock_performance_data_actor_addr.wait_for_stop().await;
 
-        let sent_messages = buf.lock().unwrap().clone();
+        let x = buf.lock().unwrap().clone();
+        x
+    }
+    #[async_std::test]
+    async fn fetch_actor_returns_quotes_from_initial_time_to_now() {
+        let now = Utc::now();
+        let sent_messages = create_buf_and_actors_and_call_actor_with(
+            vec![Ticker("test".to_string())],
+            Fetch::of(now),
+        )
+        .await;
         let message = sent_messages.into_iter().nth(0).unwrap();
 
         let expected =
-            PerformanceData::of(Ticker("test".to_string()), 30, vec![1f64, 2f64, 3f64], to);
+            PerformanceData::of(Ticker("test".to_string()), 30, vec![1f64, 2f64, 3f64], now);
         assert_eq!(message, expected);
+    }
+
+    #[async_std::test]
+    async fn fetch_actor_retrieves_multiple_tickers() {
+        let sent_messages = create_buf_and_actors_and_call_actor_with(
+            vec![Ticker("test".to_string()), Ticker("other_test".to_string())],
+            Fetch::new(),
+        )
+        .await;
+        assert_eq!(sent_messages.len(), 2);
     }
 }

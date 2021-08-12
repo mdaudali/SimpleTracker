@@ -5,7 +5,6 @@ mod config;
 mod formatter;
 mod ticker;
 
-
 #[async_std::main]
 async fn main() -> Result<()> {
     env_logger::init();
