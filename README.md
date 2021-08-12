@@ -7,22 +7,27 @@ To build:
 To run
 ```
 USAGE:
-    SimpleTracker.exe [OPTIONS] --ticker <TICKER>...
+    simple_tracker.exe [OPTIONS]
 
 FLAGS:
     -h, --help       Prints help information
     -V, --version    Prints version information
 
 OPTIONS:
-    -f, --from <FROM>           Start date to load data from
-    -t, --ticker <TICKER>...    Loads the stock data for the provided ticker
+    -f, --from <FROM>                  Start date to load data from
+    -t, --ticker <TICKER>...           Loads the stock data for the provided ticker
+    -i, --ticker-file <TICKER FILE>    Loads a comma delimited file of tickers
 ```
 
 From `cargo run`:
-`cargo run -- --ticker MSFT GOOG AAPL UBER IBM --from 2020-01-01T00:00:00Z`
+`cargo run -- --ticker MSFT GOOG AAPL UBER IBM --from 2020-01-01T00:00:00Z` or
+`cargo run -- --ticker-file sp500.txt --from 2020-01-01T00:00:00Z`
+
 
 As binary:
-`SimpleTracker.exe --ticker MSFT GOOG AAPL UBER IBM --from 2020-01-01T00:00:00Z`
+`SimpleTracker.exe --ticker MSFT GOOG AAPL UBER IBM --from 2020-01-01T00:00:00Z` or
+`SimpleTracker.exe --ticker-file sp500.txt --from 2020-01-01T00:00:00Z`
+
 
 Example output:
 ```
