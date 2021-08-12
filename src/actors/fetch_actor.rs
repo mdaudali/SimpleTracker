@@ -1,4 +1,4 @@
-use crate::performance_actor::PerformanceData;
+use crate::actors::performance_actor::PerformanceData;
 use crate::ticker::Ticker;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -100,7 +100,7 @@ impl YahooFinanceApi for YahooConnector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::performance_actor::PerformanceData;
+    use crate::actors::performance_actor::PerformanceData;
     use crate::ticker::Ticker;
     use async_std;
     use async_trait::async_trait;

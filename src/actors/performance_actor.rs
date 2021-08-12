@@ -1,5 +1,5 @@
+use crate::actors::output_actor::Output;
 use crate::formatter::{Percentage, Price};
-use crate::output_actor::Output;
 use crate::ticker::Ticker;
 use async_trait::async_trait;
 use chrono::prelude::*;
@@ -144,8 +144,8 @@ impl PerformanceIndicators {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::actors::output_actor::Output;
     use crate::formatter::*;
-    use crate::output_actor::Output;
     use crate::ticker::Ticker;
     use async_std;
     use async_trait::async_trait;
