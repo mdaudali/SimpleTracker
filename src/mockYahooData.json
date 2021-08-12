@@ -1,0 +1,100 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "USD",
+          "symbol": "PLTR",
+          "exchangeName": "NYQ",
+          "instrumentType": "EQUITY",
+          "firstTradeDate": 1601472600,
+          "regularMarketTime": 1628712003,
+          "gmtoffset": -14400,
+          "timezone": "EDT",
+          "exchangeTimezoneName": "America/New_York",
+          "regularMarketPrice": 22.35,
+          "chartPreviousClose": 21.82,
+          "priceHint": 2,
+          "currentTradingPeriod": {
+            "pre": {
+              "timezone": "EDT",
+              "start": 1628668800,
+              "end": 1628688600,
+              "gmtoffset": -14400
+            },
+            "regular": {
+              "timezone": "EDT",
+              "start": 1628688600,
+              "end": 1628712000,
+              "gmtoffset": -14400
+            },
+            "post": {
+              "timezone": "EDT",
+              "start": 1628712000,
+              "end": 1628726400,
+              "gmtoffset": -14400
+            }
+          },
+          "dataGranularity": "1d",
+          "range": "",
+          "validRanges": [
+            "1d",
+            "5d",
+            "1mo",
+            "3mo",
+            "6mo",
+            "1y",
+            "ytd",
+            "max"
+          ]
+        },
+        "timestamp": [
+          1628515800,
+          1628602200,
+          1628712003
+        ],
+        "indicators": {
+          "quote": [
+            {
+              "open": [
+                21.850000381469727,
+                23.010000228881836,
+                23.06999969482422
+              ],
+              "volume": [
+                35611100,
+                25880400,
+                33905577
+              ],
+              "high": [
+                23.280000686645508,
+                23.520000457763672,
+                23.190000534057617
+              ],
+              "close": [
+                22.93000030517578,
+                22.920000076293945,
+                22.350000381469727
+              ],
+              "low": [
+                21.799999237060547,
+                22.780000686645508,
+                22.090099334716797
+              ]
+            }
+          ],
+          "adjclose": [
+            {
+              "adjclose": [
+                1,
+                2,
+                3
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}

@@ -1,43 +1,29 @@
-use yahoo_finance_api::YahooConnector;
 use anyhow::Result;
-use futures::{
-    stream::{
-        FuturesUnordered,
-        StreamExt
-    },  
-};
-use chrono::prelude::*;
-
+use xactor::Actor;
 mod config;
-mod performance_indicators;
-mod output;
 mod ticker;
-mod price;
-mod percentage;
+mod formatter;
+mod output_actor;
+mod performance_actor;
+mod fetch_actor;
+
+// fn main() {}
 
 #[async_std::main]
 async fn main() -> Result<()> {
     let config = config::Config::new()?;
 
-    let provider = YahooConnector::new();
-    let output_fields = config.clone().tickers.iter().map(|ticker| {
-        let provider = &provider;
-        let config_clone = &config;
-        async move {
-            let quote = provider.get_quote_history(&ticker.0, config_clone.from, chrono::offset::Utc::now()).await?;
-            let quotes = quote.quotes()?;
-            let series: Vec<f64> = quotes.iter().map(|q| q.adjclose).collect();
-            let performance_indicators = performance_indicators::PerformanceIndicators::create(30, &series[..]);
-            Ok::<output::Fields, anyhow::Error>(output::Fields {
-                period_start: config_clone.from,
-                symbol: ticker.clone(),
-                price: series.last().map(|e| price::Price(*e)),
-                change: performance_indicators.percentage_change,
-                min: performance_indicators.min,
-                max: performance_indicators.max,
-                thirty_day_average: performance_indicators.n_window_sma.and_then(|sma| sma.last().map(|e| *e))
-        })
-    }}).collect::<FuturesUnordered<_>>().collect::<Vec<Result<_>>>().await.into_iter().collect::<Result<Vec<_>>>()?;
-    output::to_csv(&output_fields, Box::new(std::io::stdout()))
-    
+    let output_actor = output_actor::OutputActor::of(std::io::stdout());
+    let output_actor_addr = output_actor.start().await?;
+
+    let performance_actor = performance_actor::PerformanceActor::of(output_actor_addr.clone());
+    let performance_actor_addr = performance_actor.start().await?;
+
+    let provider = yahoo_finance_api::YahooConnector::new();
+    let fetch_actor = fetch_actor::FetchActor::of(performance_actor_addr, provider, config.tickers, config.from);
+    let fetch_actor_addr = fetch_actor.start().await?;
+
+    fetch_actor_addr.call(fetch_actor::Fetch).await.unwrap();
+    output_actor_addr.wait_for_stop().await;
+    Ok(())
 }

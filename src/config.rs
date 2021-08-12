@@ -3,17 +3,23 @@ use clap::{App, Arg};
 use anyhow::{Result, anyhow};
 use thiserror::Error;
 use crate::ticker::Ticker;
-
+use std::{fs::File, io::{BufReader, Read}};
 #[derive(Error, Debug)]
 pub enum ArgumentParsingError {
     #[error("Missing parameter: {0}")]
     MissingParameter(&'static str),
+
+    #[error("One of {0} {1} required")]
+    OneRequired(&'static str, &'static str),
+
+    #[error("Only one of {0} {1} required")]
+    TooManyParameters(&'static str, &'static str)
 }
 
 #[derive(Debug, Clone)]
 pub struct Config {
     pub tickers: Vec<Ticker>,
-    pub from: DateTime<Utc>
+    pub from: DateTime<Utc>,
 }
 
 impl Config {
@@ -26,8 +32,15 @@ impl Config {
                 .long("ticker")
                 .value_name("TICKER")
                 .help("Loads the stock data for the provided ticker")
-                .required(true)
+                // .required(true)
                 .multiple(true)
+        )
+        .arg(
+            Arg::with_name("ticker_file")
+            .short("i")
+            .long("ticker-file")
+            .value_name("TICKER FILE")
+            .help("Loads a comma delimited file of tickers")
         )
         .arg(Arg::with_name("from")
             .short("f")
@@ -36,9 +49,19 @@ impl Config {
             .help("Start date to load data from")
             ).get_matches();
 
-        let ticker_values = arg_matcher.values_of("ticker").ok_or(anyhow!(ArgumentParsingError::MissingParameter("Ticker")))?;
-        let tickers = ticker_values.into_iter().map(String::from).map(Ticker).collect();
-
+        let tickers: Vec<Ticker> = match (arg_matcher.values_of("ticker"), arg_matcher.value_of("ticker_file")) {
+            (None, None) => Err(anyhow!(ArgumentParsingError::OneRequired("Ticker", "Ticker-file"))),
+            (Some(tickers), None) => Ok(tickers.into_iter().map(String::from).map(Ticker).collect()),
+            (None, Some(tickerfile)) => {
+                let file = File::open(tickerfile).unwrap();
+                let mut reader = BufReader::new(file);
+                let mut tickers = String::new();
+                reader.read_to_string(&mut tickers)?;
+                Ok(tickers.split(",").map(String::from).map(Ticker).collect())
+            },
+            (Some(_), Some(_)) => Err(anyhow!(ArgumentParsingError::TooManyParameters("Ticker", "Ticker-File")))
+        }?;
+        println!("{:?}", tickers);
         let from_value = arg_matcher.value_of("from").ok_or(ArgumentParsingError::MissingParameter("From"))?;
         let from = DateTime::parse_from_rfc3339(from_value)?.with_timezone(&Utc);
 
