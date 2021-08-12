@@ -1,47 +1,55 @@
-use xactor::{Actor, message, Handler, Context, Addr};
+use crate::formatter::{Percentage, Price};
 use crate::output_actor::Output;
-use async_trait::async_trait;
 use crate::ticker::Ticker;
-use crate::formatter::{Price, Percentage};
-use serde::Serialize;
+use async_trait::async_trait;
 use chrono::prelude::*;
+use serde::Serialize;
+use xactor::{message, Actor, Addr, Context, Handler};
 #[message]
 #[derive(Clone, PartialEq, Debug)]
 pub struct PerformanceData {
     ticker: Ticker,
     window: usize,
-    performance_data:  Vec<f64>,
-    to: DateTime<Utc>
+    performance_data: Vec<f64>,
+    to: DateTime<Utc>,
 }
 
 impl PerformanceData {
-    pub fn of(ticker: Ticker, window: usize, performance_data: Vec<f64>, to: DateTime<Utc>) -> Self {
-        PerformanceData { ticker, window, performance_data, to }
+    pub fn of(
+        ticker: Ticker,
+        window: usize,
+        performance_data: Vec<f64>,
+        to: DateTime<Utc>,
+    ) -> Self {
+        PerformanceData {
+            ticker,
+            window,
+            performance_data,
+            to,
+        }
     }
 }
 pub struct PerformanceActor<T: Handler<Output<PerformanceIndicators>>> {
-    addr: Addr<T>
+    addr: Addr<T>,
 }
 
-impl <T: Handler<Output<PerformanceIndicators>>> PerformanceActor<T> {
+impl<T: Handler<Output<PerformanceIndicators>>> PerformanceActor<T> {
     pub fn of(addr: Addr<T>) -> Self {
-        PerformanceActor {
-            addr
-        }
+        PerformanceActor { addr }
     }
-} 
-impl <T: Handler<Output<PerformanceIndicators>>> Actor for PerformanceActor<T> {}
+}
+impl<T: Handler<Output<PerformanceIndicators>>> Actor for PerformanceActor<T> {}
 
 #[async_trait]
-impl <T: Handler<Output<PerformanceIndicators>>> Handler<PerformanceData> for PerformanceActor<T> {
+impl<T: Handler<Output<PerformanceIndicators>>> Handler<PerformanceData> for PerformanceActor<T> {
     // TODO: Make result type, since we don't want to drop performance data
     // TODO: Remove all the unwraps.
     async fn handle(&mut self, _ctx: &mut Context<Self>, msg: PerformanceData) -> () {
-        let performance_indicators = PerformanceIndicators::create(msg.window, &msg.performance_data, msg.ticker, msg.to);
+        let performance_indicators =
+            PerformanceIndicators::create(msg.window, &msg.performance_data, msg.ticker, msg.to);
         self.addr.send(Output::of(performance_indicators)).unwrap();
     }
 }
-
 
 #[derive(Debug, PartialEq, Serialize, Clone)]
 pub struct PerformanceIndicators {
@@ -51,7 +59,7 @@ pub struct PerformanceIndicators {
     max: Option<Price>,
     n_window_sma: Option<Price>,
     percentage_change: Option<Percentage>,
-    abs_change: Option<Price>
+    abs_change: Option<Price>,
 }
 
 fn min(series: &[f64]) -> Option<f64> {
@@ -107,10 +115,17 @@ fn price_diff(series: &[f64]) -> Option<(f64, f64)> {
 }
 
 impl PerformanceIndicators {
-    pub fn create(window: usize, series: &[f64], ticker: Ticker, time: DateTime<Utc>) -> PerformanceIndicators {
+    pub fn create(
+        window: usize,
+        series: &[f64],
+        ticker: Ticker,
+        time: DateTime<Utc>,
+    ) -> PerformanceIndicators {
         let (percentage_change, abs_change) = match price_diff(series) {
-            Some((percentage_change, abs_change)) => (Some(Percentage(percentage_change)), Some(Price(abs_change))),
-            None => (None, None)
+            Some((percentage_change, abs_change)) => {
+                (Some(Percentage(percentage_change)), Some(Price(abs_change)))
+            }
+            None => (None, None),
         };
 
         PerformanceIndicators {
@@ -118,33 +133,33 @@ impl PerformanceIndicators {
             time,
             min: min(series).map(Price),
             max: max(series).map(Price),
-            n_window_sma: n_window_sma(window, series).and_then(|vec| vec.into_iter().map(Price).last()),
+            n_window_sma: n_window_sma(window, series)
+                .and_then(|vec| vec.into_iter().map(Price).last()),
             percentage_change,
-            abs_change
+            abs_change,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use xactor::{Actor, Handler, Context};
-    use async_std;
-    use crate::ticker::Ticker;
+    use super::*;
     use crate::formatter::*;
     use crate::output_actor::Output;
-    use std::sync::{Mutex, Arc};
+    use crate::ticker::Ticker;
+    use async_std;
     use async_trait::async_trait;
-    use super::*;
-
+    use std::sync::{Arc, Mutex};
+    use xactor::{Actor, Context, Handler};
 
     struct MockOutputActor {
-        received_messages: Arc<Mutex<Vec<PerformanceIndicators>>>
+        received_messages: Arc<Mutex<Vec<PerformanceIndicators>>>,
     }
-    
+
     impl MockOutputActor {
         fn of(buf: Arc<Mutex<Vec<PerformanceIndicators>>>) -> Self {
             MockOutputActor {
-                received_messages: buf
+                received_messages: buf,
             }
         }
     }
@@ -152,7 +167,11 @@ mod tests {
 
     #[async_trait]
     impl Handler<Output<PerformanceIndicators>> for MockOutputActor {
-        async fn handle(&mut self, _ctx: &mut Context<Self>, msg: Output<PerformanceIndicators>) -> () {
+        async fn handle(
+            &mut self,
+            _ctx: &mut Context<Self>,
+            msg: Output<PerformanceIndicators>,
+        ) -> () {
             let mut data = self.received_messages.lock().unwrap();
             data.push(msg.to_inner().to_owned())
         }
@@ -177,16 +196,15 @@ mod tests {
             max: Some(Price(15f64)),
             n_window_sma: Some(Price(4.75f64)),
             percentage_change: Some(Percentage(50f64)),
-            abs_change: Some(Price(-7.5f64))
+            abs_change: Some(Price(-7.5f64)),
         };
 
         let performance_data = PerformanceData {
             ticker,
             window: 2,
             performance_data: Vec::from(series),
-            to: time
+            to: time,
         };
-
 
         addr.call(performance_data).await.unwrap();
 
@@ -201,7 +219,7 @@ mod tests {
     #[test]
     fn min_returns_none_on_empty_list() {
         assert_eq!(min(&[]), None);
-    }  
+    }
 
     #[test]
     fn min_returns_minimum_value_on_non_empty_list() {
@@ -253,5 +271,4 @@ mod tests {
         let expected = (0f64, -16f64);
         assert_eq!(price_diff(&series), Some(expected));
     }
-
 }

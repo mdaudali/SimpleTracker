@@ -1,5 +1,5 @@
-mod price;
 mod percentage;
+mod price;
 
-pub use price::Price;
 pub use percentage::Percentage;
+pub use price::Price;

@@ -1,11 +1,11 @@
 use anyhow::Result;
 use xactor::Actor;
 mod config;
-mod ticker;
+mod fetch_actor;
 mod formatter;
 mod output_actor;
 mod performance_actor;
-mod fetch_actor;
+mod ticker;
 
 // fn main() {}
 
@@ -20,10 +20,18 @@ async fn main() -> Result<()> {
     let performance_actor_addr = performance_actor.start().await?;
 
     let provider = yahoo_finance_api::YahooConnector::new();
-    let fetch_actor = fetch_actor::FetchActor::of(performance_actor_addr, provider, config.tickers, config.from);
+    let fetch_actor = fetch_actor::FetchActor::of(
+        performance_actor_addr,
+        provider,
+        config.tickers,
+        config.from,
+    );
     let fetch_actor_addr = fetch_actor.start().await?;
 
-    fetch_actor_addr.call(fetch_actor::Fetch::new()).await.unwrap();
+    fetch_actor_addr
+        .call(fetch_actor::Fetch::new())
+        .await
+        .unwrap();
     output_actor_addr.wait_for_stop().await;
     Ok(())
 }

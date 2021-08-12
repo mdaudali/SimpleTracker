@@ -1,5 +1,5 @@
+use serde::{Serialize, Serializer};
 use std::fmt;
-use serde::{Serializer, Serialize};
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Price(pub f64);
 
