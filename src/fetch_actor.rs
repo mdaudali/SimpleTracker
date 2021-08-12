@@ -9,7 +9,19 @@ use futures::{stream, stream::StreamExt};
 use chrono::prelude::*;
 #[message]
 #[derive(Clone)]
-pub struct Fetch;
+pub struct Fetch {
+    to: DateTime<Utc>,
+}
+
+impl Fetch {
+    pub fn new() -> Self {
+        Fetch::of(Utc::now())
+    }
+
+    pub fn of(to: DateTime<Utc>) -> Self {
+        Fetch { to }
+    }
+}
 
 pub struct FetchActor<T: YahooFinanceApi, H: Handler<PerformanceData>> {
     sender: Addr<H>,
@@ -28,20 +40,19 @@ impl <T: YahooFinanceApi, H: Handler<PerformanceData>> FetchActor<T, H> {
 #[async_trait]
 impl <T: YahooFinanceApi + Send + Sync + 'static, H: Handler<PerformanceData>> Actor for FetchActor<T, H> {
     async fn started(&mut self, ctx: &mut Context<Self>) -> Result<()> {
-        ctx.send_interval(Fetch, Duration::from_secs(30));
+        ctx.send_interval_with(Fetch::new, Duration::from_secs(30));
         Ok(())
     }
 }
 
 #[async_trait]
 impl <T: YahooFinanceApi + Send + Sync + 'static, H: Handler<PerformanceData>> Handler<Fetch> for FetchActor<T, H> {
-    async fn handle(&mut self, _ctx: &mut Context<Self>, _msg: Fetch) -> () {
+    async fn handle(&mut self, _ctx: &mut Context<Self>, msg: Fetch) -> () {
         let provider = &self.yahoo_api;
         let from = self.from;
-        let to = Utc::now();
+        let to = msg.to;
         let sender = &self.sender;
         stream::iter(self.tickers.clone()).for_each_concurrent(None, |ticker| {
-            let ticker = ticker.clone();
             async move { 
                 let response = provider.get_quote_history(&ticker.0, from, to).await.unwrap();
                 let quotes = response.quotes().unwrap();
@@ -135,7 +146,9 @@ mod tests {
         let mock_yahoo_api = MockYahooConnector;
         let fetch_actor = FetchActor::of(mock_performance_data_actor_addr.clone(), mock_yahoo_api, vec![Ticker("test".to_string())], Utc::now());
         let mut fetch_actor_addr = fetch_actor.start().await.unwrap();
-        fetch_actor_addr.call(Fetch).await.unwrap();
+
+        let to = Utc::now();
+        fetch_actor_addr.call(Fetch::of(to)).await.unwrap();
 
         fetch_actor_addr.stop(None).unwrap();
         mock_performance_data_actor_addr.stop(None).unwrap();
@@ -146,11 +159,8 @@ mod tests {
 
         let sent_messages = buf.lock().unwrap().clone();
         let message = sent_messages.into_iter().nth(0).unwrap();
-        assert_eq!(message.ticker(), Ticker("test".to_string()));
-        assert_eq!(message.performance_data(), vec![1f64, 2f64, 3f64]);
 
-
-        // let 
-
+        let expected = PerformanceData::of(Ticker("test".to_string()), 30, vec![1f64, 2f64, 3f64], to);
+        assert_eq!(message, expected);
     }
 }

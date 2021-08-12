@@ -18,15 +18,6 @@ impl PerformanceData {
     pub fn of(ticker: Ticker, window: usize, performance_data: Vec<f64>, to: DateTime<Utc>) -> Self {
         PerformanceData { ticker, window, performance_data, to }
     }
-
-    pub fn ticker(&self) -> Ticker {
-        self.ticker.clone()
-    }
-
-    pub fn performance_data(&self) -> Vec<f64> {
-        self.performance_data.clone()
-    }
-
 }
 pub struct PerformanceActor<T: Handler<Output<PerformanceIndicators>>> {
     addr: Addr<T>
@@ -163,7 +154,7 @@ mod tests {
     impl Handler<Output<PerformanceIndicators>> for MockOutputActor {
         async fn handle(&mut self, _ctx: &mut Context<Self>, msg: Output<PerformanceIndicators>) -> () {
             let mut data = self.received_messages.lock().unwrap();
-            data.push(msg.to_inner())
+            data.push(msg.to_inner().to_owned())
         }
     }
 

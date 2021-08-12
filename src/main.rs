@@ -23,7 +23,7 @@ async fn main() -> Result<()> {
     let fetch_actor = fetch_actor::FetchActor::of(performance_actor_addr, provider, config.tickers, config.from);
     let fetch_actor_addr = fetch_actor.start().await?;
 
-    fetch_actor_addr.call(fetch_actor::Fetch).await.unwrap();
+    fetch_actor_addr.call(fetch_actor::Fetch::new()).await.unwrap();
     output_actor_addr.wait_for_stop().await;
     Ok(())
 }

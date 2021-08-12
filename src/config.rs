@@ -57,7 +57,7 @@ impl Config {
                 let mut reader = BufReader::new(file);
                 let mut tickers = String::new();
                 reader.read_to_string(&mut tickers)?;
-                Ok(tickers.split(",").map(String::from).map(Ticker).collect())
+                Ok(tickers.split(',').map(String::from).map(Ticker).collect())
             },
             (Some(_), Some(_)) => Err(anyhow!(ArgumentParsingError::TooManyParameters("Ticker", "Ticker-File")))
         }?;

@@ -9,8 +9,8 @@ impl <T: Serialize> Output<T> {
         Output(serializable)
     }
 
-    pub fn to_inner(self) -> T {
-        self.0
+    pub fn to_inner(&self) -> &T {
+        &self.0
     }
 }
 impl <T: Serialize + Send + 'static> Message for Output<T> {
@@ -35,7 +35,7 @@ impl <W: Write + Send + 'static> Actor for OutputActor<W> {}
 #[async_trait]
 impl <T: Serialize + Send + 'static, W: Write + Send + 'static> Handler<Output<T>> for OutputActor<W> {
     async fn handle(&mut self, _ctx: &mut Context<Self>, msg: Output<T>) -> () {
-        self.csv_writer.serialize(msg.0).unwrap();
+        self.csv_writer.serialize(msg.to_inner()).unwrap();
         self.csv_writer.flush().unwrap();
     }
 }
