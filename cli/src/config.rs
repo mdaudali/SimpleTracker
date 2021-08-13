@@ -1,9 +1,10 @@
-use crate::ticker::Ticker;
+use lib::ticker::Ticker;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use clap::{App, Arg};
 use std::fs::read_to_string;
 use thiserror::Error;
+
 #[derive(Error, Debug)]
 pub enum ArgumentParsingError {
     #[error("Missing parameter: {0}")]

@@ -39,3 +39,11 @@ period_start,symbol,price,change,min,max,thirty_day_average
 2020-01-01T00:00:00Z,IBM,$142.76,113.69%,$88.80,$151.28,$142.07
 ```
 
+### Cross compiling:
+Targets: x86_64-unknown-linux-musl
+Run:
+```bash
+rustup target add x86_64-unknown-linux-musl;
+cd lib;
+cargo build --release --target=x86_64-unknown-linux-musl;
+```

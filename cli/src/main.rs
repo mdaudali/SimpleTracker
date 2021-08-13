@@ -2,8 +2,6 @@ use anyhow::Result;
 use xactor::Actor;
 mod actors;
 mod config;
-mod formatter;
-mod ticker;
 
 #[async_std::main]
 async fn main() -> Result<()> {

@@ -1,5 +1,5 @@
 use crate::actors::performance_actor::PerformanceData;
-use crate::ticker::Ticker;
+use lib::ticker::Ticker;
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::prelude::*;
@@ -111,7 +111,7 @@ impl YahooFinanceApi for YahooConnector {
 mod tests {
     use super::*;
     use crate::actors::performance_actor::PerformanceData;
-    use crate::ticker::Ticker;
+    use lib::ticker::Ticker;
     use async_std;
     use async_trait::async_trait;
     use serde_json;
