@@ -99,9 +99,7 @@ impl Fetch {
     }
 
     pub fn from_datetime(until: DateTime<Utc>) -> Self {
-        Fetch {
-            until
-        }
+        Fetch { until }
     }
     pub fn until(&self) -> DateTime<Utc> {
         self.until
@@ -111,5 +109,32 @@ impl Fetch {
 impl Default for Fetch {
     fn default() -> Self {
         Fetch::new()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::PerformanceIndicators;
+    use chrono::Utc;
+    use lib::formatter::{Percentage, Price};
+    use lib::ticker::Ticker;
+    #[test]
+    fn performance_indicators_constructor_has_correct_metrics() {
+        let series = [15f64, 13f64, 2f64, 7.5f64];
+        let time = Utc::now();
+        let expected = PerformanceIndicators {
+            ticker: Ticker::from("TEST"),
+            current_price: Some(Price(7.5f64)),
+            time,
+            min: Some(Price(2f64)),
+            max: Some(Price(15f64)),
+            n_window_sma: Some(Price(4.75f64)),
+            percentage_change: Some(Percentage(50f64)),
+            abs_change: Some(Price(-7.5f64)),
+        };
+        assert_eq!(
+            PerformanceIndicators::new(2, &series, Ticker::from("TEST"), time),
+            expected
+        );
     }
 }

@@ -1,7 +1,7 @@
 use serde::Serialize;
-use std::fmt::{Display, Formatter, Error};
-use std::str::FromStr;
 use std::convert::Infallible;
+use std::fmt::{Display, Error, Formatter};
+use std::str::FromStr;
 #[derive(Debug, Serialize, Clone, PartialEq, Eq, Hash)]
 pub struct Ticker(String);
 
@@ -31,7 +31,7 @@ impl FromStr for Ticker {
     type Err = Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-       Ok(Ticker::from(s))
+        Ok(Ticker::from(s))
     }
 }
 

@@ -42,15 +42,18 @@ mod tests {
 
     #[async_std::test]
     async fn in_memory_quote_writer_writes_data() {
-        let store = Arc::new(RwLock::new(BoundedVecDeque::new(1)));
+        let store = Arc::new(RwLock::new(BoundedVecDeque::new(10)));
         let actor = InMemoryQuoteWriter::new(store.clone());
         let mut actor_addr = actor.start().await.unwrap();
-        let s = PerformanceIndicators::new(20, vec![], Ticker::new("test".to_owned()), Utc::now());
+        let s = PerformanceIndicators::new(20, &vec![], Ticker::from("test"), Utc::now());
         actor_addr.call(s.clone()).await.unwrap();
         actor_addr.stop(None).unwrap();
         actor_addr.wait_for_stop().await;
 
-        let mut r = store.write().unwrap();
-        assert_eq!(r.pop_front(), Some(s));
+        let r = store.read().unwrap();
+        assert!(r.iter().any(|x| *x == s));
+        // Unfortunately, since Rust runs tests in parallel, this test can be affected by tests in performance_actor since performance actor publishes a message
+        // that this actor listens to. The quick solution was to check that we're storing the message at all (and really, we could just test that there exists a message)
+        // To avoid the clash, we could either decouple this class from PerformanceIndicators and/or decouple the performance actor from broker.
     }
 }

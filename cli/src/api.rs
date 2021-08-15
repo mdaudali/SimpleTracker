@@ -35,9 +35,7 @@ mod handlers {
         buf: ReadOptimisedCircularBuffer<PerformanceIndicators>,
     ) -> impl warp::Reply {
         let reader = buf.read().unwrap();
-        warp::reply::json(&Indicators::new(
-            reader.iter().take(n).cloned().collect(),
-        ))
+        warp::reply::json(&Indicators::new(reader.iter().take(n).cloned().collect()))
     }
 }
 

@@ -36,7 +36,6 @@ mod tests {
     use async_std;
     use async_trait::async_trait;
     use chrono::Utc;
-    use lib::formatter::{Percentage, Price};
     use lib::ticker::Ticker;
     use std::sync::{Arc, Mutex};
     use xactor::{Actor, Broker, Context, Handler, Service};
@@ -79,32 +78,19 @@ mod tests {
         let performance_actor = PerformanceActor::new(broker.clone());
         let mut addr = performance_actor.start().await.unwrap();
 
-        let ticker = Ticker::new(String::from("test"));
+        let ticker = Ticker::from("test");
         let series = [15f64, 13f64, 2f64, 7.5f64];
         let time = Utc::now();
-        let expected = PerformanceIndicators {
-            ticker: ticker.clone(),
-            time,
-            current_price: Some(Price(7.5f64)),
-            min: Some(Price(2f64)),
-            max: Some(Price(15f64)),
-            n_window_sma: Some(Price(4.75f64)),
-            percentage_change: Some(Percentage(50f64)),
-            abs_change: Some(Price(-7.5f64)),
-        };
+        let expected = PerformanceIndicators::new(2, &series, ticker.clone(), time);
 
-        let performance_data = PerformanceData {
-            ticker,
-            window: 2,
-            performance_data: Vec::from(series),
-            to: time,
-        };
+        let performance_data = PerformanceData::new(ticker, 2, Vec::from(series), time);
 
         addr.call(performance_data).await.unwrap();
 
         addr.stop(None).unwrap();
-        mock_actor_addr.stop(None).unwrap();
         addr.wait_for_stop().await;
+        mock_actor_addr.stop(None).unwrap();
+
         mock_actor_addr.wait_for_stop().await;
         let received_messages = buffer.lock().unwrap().clone();
         assert_eq!(received_messages.into_iter().nth(0).unwrap(), expected);

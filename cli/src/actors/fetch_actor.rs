@@ -184,15 +184,22 @@ mod tests {
         .await;
         let message = sent_messages.into_iter().nth(0).unwrap();
 
-        let expected =
-            PerformanceData::new(Ticker::new("test".to_string()), 30, vec![1f64, 2f64, 3f64], now);
+        let expected = PerformanceData::new(
+            Ticker::new("test".to_string()),
+            30,
+            vec![1f64, 2f64, 3f64],
+            now,
+        );
         assert_eq!(message, expected);
     }
 
     #[async_std::test]
     async fn fetch_actor_retrieves_multiple_tickers() {
         let sent_messages = create_buf_and_actors_and_call_actor_with(
-            vec![Ticker::new("test".to_string()), Ticker::new("other_test".to_string())],
+            vec![
+                Ticker::new("test".to_string()),
+                Ticker::new("other_test".to_string()),
+            ],
             Fetch::new(),
         )
         .await;

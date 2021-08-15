@@ -68,12 +68,18 @@ impl Config {
                 "Ticker",
                 "Ticker-file"
             ))),
-            (Some(tickers), None) => {
-                Ok(tickers.into_iter().map(String::from).map(Ticker::new).collect())
-            }
+            (Some(tickers), None) => Ok(tickers
+                .into_iter()
+                .map(String::from)
+                .map(Ticker::new)
+                .collect()),
             (None, Some(tickerfile)) => {
                 let tickers = read_to_string(tickerfile)?;
-                Ok(tickers.split(',').map(String::from).map(Ticker::new).collect())
+                Ok(tickers
+                    .split(',')
+                    .map(String::from)
+                    .map(Ticker::new)
+                    .collect())
             }
             (Some(_), Some(_)) => Err(anyhow!(ArgumentParsingError::TooManyParameters(
                 "Ticker",
