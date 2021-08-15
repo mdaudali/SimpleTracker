@@ -15,7 +15,7 @@ To build:
 To run
 ```
 USAGE:
-    simple_tracker.exe [OPTIONS]
+    SimpleTracker.exe [OPTIONS]
 
 FLAGS:
     -h, --help       Prints help information
@@ -50,7 +50,9 @@ period_start,symbol,price,change,min,max,thirty_day_average
 
 ### Cross compiling:
 Full bin cross compilation coming soon!
+
 Targets: x86_64-unknown-linux-musl
+
 Run:
 ```bash
 rustup target add x86_64-unknown-linux-musl;
