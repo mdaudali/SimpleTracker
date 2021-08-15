@@ -1,29 +1,13 @@
-use crate::actors::performance_actor::PerformanceData;
-use lib::ticker::Ticker;
+use crate::actors::messages::{Fetch, PerformanceData};
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::prelude::*;
 use futures::{stream, stream::StreamExt};
+use lib::ticker::Ticker;
 use log::error;
 use std::time::Duration;
-use xactor::{message, Actor, Addr, Context, Handler};
+use xactor::{Actor, Addr, Context, Handler};
 use yahoo_finance_api::{YResponse, YahooConnector, YahooError};
-
-#[message]
-#[derive(Clone)]
-pub struct Fetch {
-    to: DateTime<Utc>,
-}
-
-impl Fetch {
-    pub fn new() -> Self {
-        Fetch::of(Utc::now())
-    }
-
-    pub fn of(to: DateTime<Utc>) -> Self {
-        Fetch { to }
-    }
-}
 
 pub struct FetchActor<T: YahooFinanceApi, H: Handler<PerformanceData>> {
     sender: Addr<H>,
@@ -60,7 +44,7 @@ impl<T: YahooFinanceApi + Send + Sync + 'static, H: Handler<PerformanceData>> Ha
     async fn handle(&mut self, _ctx: &mut Context<Self>, msg: Fetch) -> () {
         let provider = &self.yahoo_api;
         let from = self.from;
-        let to = msg.to;
+        let to = msg.to();
         let sender = &self.sender;
         stream::iter(self.tickers.clone())
             .for_each_concurrent(None, |ticker| async move {
@@ -110,10 +94,10 @@ impl YahooFinanceApi for YahooConnector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::actors::performance_actor::PerformanceData;
-    use lib::ticker::Ticker;
+    use crate::actors::messages::{Fetch, PerformanceData};
     use async_std;
     use async_trait::async_trait;
+    use lib::ticker::Ticker;
     use serde_json;
     use std::fs::File;
     use std::io::BufReader;

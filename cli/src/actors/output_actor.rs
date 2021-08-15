@@ -1,64 +1,78 @@
+use anyhow::Result;
 use async_trait::async_trait;
 use log::error;
 use serde::Serialize;
 use std::io::Write;
+use std::marker::PhantomData;
 use std::time::Duration;
-use xactor::{Actor, Context, Handler, Message};
+use xactor::{message, Actor, Context, Handler, Message};
 
-pub struct Output<T: Serialize>(T);
-impl<T: Serialize> Output<T> {
-    pub fn of(serializable: T) -> Self {
-        Output(serializable)
-    }
+#[message]
+#[derive(Clone)]
+struct Flush;
 
-    pub fn to_inner(&self) -> &T {
-        &self.0
-    }
-}
-impl<T: Serialize + Send + 'static> Message for Output<T> {
-    type Result = ();
-}
-
-pub struct OutputActor<W: Write> {
+pub struct OutputActor<W: Write, T: Serialize + Message<Result = ()>> {
     csv_writer: csv::Writer<W>,
+    _phantom: PhantomData<T>,
 }
 
-impl<W: Write> OutputActor<W> {
+impl<W: Write, T: Serialize + Message<Result = ()>> OutputActor<W, T> {
     pub fn of(writer: W) -> Self {
         OutputActor {
             csv_writer: csv::Writer::from_writer(writer),
+            _phantom: PhantomData,
         }
     }
 }
 
-impl<W: Write + Send + 'static> Actor for OutputActor<W> {}
+#[async_trait]
+impl<W: Write + Send + 'static, T: Serialize + Message<Result = ()> + Send + 'static> Actor
+    for OutputActor<W, T>
+{
+    async fn started(&mut self, ctx: &mut Context<Self>) -> Result<()> {
+        ctx.send_interval(Flush, Duration::from_secs(15));
+        ctx.subscribe::<T>().await?;
+        Ok(())
+    }
+}
 
 #[async_trait]
-impl<T: Serialize + Send + 'static, W: Write + Send + 'static> Handler<Output<T>>
-    for OutputActor<W>
+impl<W: Write + Send + 'static, T: Serialize + Message<Result = ()> + Send + 'static> Handler<Flush>
+    for OutputActor<W, T>
 {
-    async fn handle(&mut self, ctx: &mut Context<Self>, msg: Output<T>) -> () {
-        if let Err(e) = self.csv_writer.serialize(msg.to_inner()) {
+    async fn handle(&mut self, _ctx: &mut Context<Self>, _msg: Flush) -> () {
+        if let Err(e) = self.csv_writer.flush() {
+            error!("Failed to flush writer: {:?}", e);
+        }
+    }
+}
+
+#[async_trait]
+impl<W: Write + Send + 'static, T: Serialize + Send + Message<Result = ()> + 'static> Handler<T>
+    for OutputActor<W, T>
+{
+    async fn handle(&mut self, ctx: &mut Context<Self>, msg: T) -> () {
+        if let Err(e) = self.csv_writer.serialize(&msg) {
             error!(
                 "Failed to serialize data for msg: {:?}. Retrying in 5 seconds",
                 e
             );
             ctx.send_later(msg, Duration::from_secs(5));
         };
-        let _ = self.csv_writer.flush();
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Output, OutputActor};
+    use super::{Flush, OutputActor};
     use serde::Serialize;
     use std::io::{Result, Write};
     use std::sync::{Arc, Mutex};
-    use xactor::Actor;
+    use xactor::{message, Actor};
 
     struct MockWriter {
         buf: Arc<Mutex<Vec<u8>>>,
+        flush: Arc<Mutex<i32>>,
     }
 
     impl Write for MockWriter {
@@ -69,25 +83,30 @@ mod tests {
         }
 
         fn flush(&mut self) -> Result<()> {
+            let mut data = self.flush.lock().unwrap();
+            *data += 1;
             Ok(())
         }
     }
 
     impl MockWriter {
-        fn new(buf: Arc<Mutex<Vec<u8>>>) -> Self {
-            MockWriter { buf }
+        fn new(buf: Arc<Mutex<Vec<u8>>>, flush: Arc<Mutex<i32>>) -> Self {
+            MockWriter { buf, flush }
         }
     }
 
+    #[message]
     #[derive(Serialize)]
     struct MockSerializable {
         test: String,
         other_test: i32,
     }
+
     #[async_std::test]
     async fn output_actor_emits_csv_record_with_headers_on_initial_message() {
         let buffer = Arc::new(Mutex::new(vec![]));
-        let mock_writer: MockWriter = MockWriter::new(buffer.clone());
+        let flush = Arc::new(Mutex::new(0));
+        let mock_writer: MockWriter = MockWriter::new(buffer.clone(), flush);
         let output_actor = OutputActor::of(mock_writer);
 
         let mock_serializable = MockSerializable {
@@ -96,7 +115,7 @@ mod tests {
         };
 
         let mut addr = output_actor.start().await.unwrap();
-        addr.call(Output(mock_serializable)).await.unwrap();
+        addr.call(mock_serializable).await.unwrap();
         addr.stop(None).unwrap();
         addr.wait_for_stop().await;
         assert!(buffer
@@ -106,9 +125,25 @@ mod tests {
     }
 
     #[async_std::test]
+    async fn output_actor_flushes_on_flush_message() {
+        let buffer = Arc::new(Mutex::new(vec![]));
+        let flush = Arc::new(Mutex::new(0));
+        let mock_writer: MockWriter = MockWriter::new(buffer.clone(), flush.clone());
+        let output_actor: OutputActor<_, MockSerializable> = OutputActor::of(mock_writer);
+
+        let mut addr = output_actor.start().await.unwrap();
+        addr.call(Flush).await.unwrap();
+        addr.stop(None).unwrap();
+        addr.wait_for_stop().await;
+        let flush_count = flush.lock().unwrap();
+        assert!(*flush_count > 0);
+    }
+
+    #[async_std::test]
     async fn output_actor_doesnt_emit_new_header_per_message() {
         let buffer = Arc::new(Mutex::new(vec![]));
-        let mock_writer: MockWriter = MockWriter::new(buffer.clone());
+        let flush = Arc::new(Mutex::new(0));
+        let mock_writer: MockWriter = MockWriter::new(buffer.clone(), flush);
         let output_actor = OutputActor::of(mock_writer);
 
         let mock_serializable_one = MockSerializable {
@@ -121,8 +156,8 @@ mod tests {
         };
 
         let mut addr = output_actor.start().await.unwrap();
-        addr.call(Output(mock_serializable_one)).await.unwrap();
-        addr.call(Output(mock_serializable_two)).await.unwrap();
+        addr.call(mock_serializable_one).await.unwrap();
+        addr.call(mock_serializable_two).await.unwrap();
 
         addr.stop(None).unwrap();
         addr.wait_for_stop().await;

@@ -1,4 +1,3 @@
-
 pub fn min(series: &[f64]) -> Option<f64> {
     get_extreme(series, |v, mv| v < mv)
 }

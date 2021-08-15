@@ -1,93 +1,31 @@
-use crate::actors::output_actor::Output;
-use lib::formatter::{Percentage, Price};
-use lib::ticker::Ticker;
-use lib::performance_indicators::*;
+// use crate::actors::output_actor::Output;
+use crate::actors::messages::{PerformanceData, PerformanceIndicators};
 use async_trait::async_trait;
-use chrono::prelude::*;
 use log::error;
-use serde::Serialize;
-use xactor::{message, Actor, Addr, Context, Handler};
-#[message]
-#[derive(Clone, PartialEq, Debug)]
-pub struct PerformanceData {
-    ticker: Ticker,
-    window: usize,
-    performance_data: Vec<f64>,
-    to: DateTime<Utc>,
+use xactor::{Actor, Addr, Broker, Context, Handler};
+
+pub struct PerformanceActor {
+    addr: Addr<Broker<PerformanceIndicators>>,
 }
 
-impl PerformanceData {
-    pub fn of(
-        ticker: Ticker,
-        window: usize,
-        performance_data: Vec<f64>,
-        to: DateTime<Utc>,
-    ) -> Self {
-        PerformanceData {
-            ticker,
-            window,
-            performance_data,
-            to,
-        }
-    }
-}
-pub struct PerformanceActor<T: Handler<Output<PerformanceIndicators>>> {
-    addr: Addr<T>,
-}
-
-impl<T: Handler<Output<PerformanceIndicators>>> PerformanceActor<T> {
-    pub fn of(addr: Addr<T>) -> Self {
+impl PerformanceActor {
+    pub fn of(addr: Addr<Broker<PerformanceIndicators>>) -> Self {
         PerformanceActor { addr }
     }
 }
-impl<T: Handler<Output<PerformanceIndicators>>> Actor for PerformanceActor<T> {}
+impl Actor for PerformanceActor {}
 
 #[async_trait]
-impl<T: Handler<Output<PerformanceIndicators>>> Handler<PerformanceData> for PerformanceActor<T> {
+impl Handler<PerformanceData> for PerformanceActor {
     async fn handle(&mut self, _ctx: &mut Context<Self>, msg: PerformanceData) -> () {
-        let performance_indicators =
-            PerformanceIndicators::create(msg.window, &msg.performance_data, msg.ticker, msg.to);
-        if let Err(e) = self.addr.send(Output::of(performance_indicators)) {
+        let performance_indicators = PerformanceIndicators::create(
+            msg.window(),
+            msg.performance_data(),
+            msg.ticker().clone(),
+            msg.to(),
+        );
+        if let Err(e) = self.addr.publish(performance_indicators) {
             error!("Failed to send performance indicators: {:?}", e);
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Serialize, Clone)]
-pub struct PerformanceIndicators {
-    ticker: Ticker,
-    time: DateTime<Utc>,
-    min: Option<Price>,
-    max: Option<Price>,
-    n_window_sma: Option<Price>,
-    percentage_change: Option<Percentage>,
-    abs_change: Option<Price>,
-}
-
-
-impl PerformanceIndicators {
-    pub fn create(
-        window: usize,
-        series: &[f64],
-        ticker: Ticker,
-        time: DateTime<Utc>,
-    ) -> PerformanceIndicators {
-        let (percentage_change, abs_change) = match price_diff(series) {
-            Some((percentage_change, abs_change)) => {
-                (Some(Percentage(percentage_change)), Some(Price(abs_change)))
-            }
-            None => (None, None),
-        };
-
-        PerformanceIndicators {
-            ticker,
-            time,
-            min: min(series).map(Price),
-            max: max(series).map(Price),
-            n_window_sma: n_window_sma(window, series)
-                .and_then(|vec| vec.into_iter().map(Price).last()),
-            percentage_change,
-            abs_change,
         }
     }
 }
@@ -95,13 +33,13 @@ impl PerformanceIndicators {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::actors::output_actor::Output;
-    use lib::formatter::{Price, Percentage};
-    use lib::ticker::Ticker;
     use async_std;
     use async_trait::async_trait;
+    use chrono::Utc;
+    use lib::formatter::{Percentage, Price};
+    use lib::ticker::Ticker;
     use std::sync::{Arc, Mutex};
-    use xactor::{Actor, Context, Handler};
+    use xactor::{Actor, Broker, Context, Handler, Service};
 
     struct MockOutputActor {
         received_messages: Arc<Mutex<Vec<PerformanceIndicators>>>,
@@ -114,17 +52,20 @@ mod tests {
             }
         }
     }
-    impl Actor for MockOutputActor {}
 
     #[async_trait]
-    impl Handler<Output<PerformanceIndicators>> for MockOutputActor {
-        async fn handle(
-            &mut self,
-            _ctx: &mut Context<Self>,
-            msg: Output<PerformanceIndicators>,
-        ) -> () {
+    impl Actor for MockOutputActor {
+        async fn started(&mut self, ctx: &mut Context<Self>) -> anyhow::Result<()> {
+            ctx.subscribe::<PerformanceIndicators>().await?;
+            Ok(())
+        }
+    }
+
+    #[async_trait]
+    impl Handler<PerformanceIndicators> for MockOutputActor {
+        async fn handle(&mut self, _ctx: &mut Context<Self>, msg: PerformanceIndicators) -> () {
             let mut data = self.received_messages.lock().unwrap();
-            data.push(msg.to_inner().to_owned())
+            data.push(msg)
         }
     }
 
@@ -134,7 +75,8 @@ mod tests {
         let mock_actor = MockOutputActor::of(buffer.clone());
         let mut mock_actor_addr = mock_actor.start().await.unwrap();
 
-        let performance_actor = PerformanceActor::of(mock_actor_addr.clone());
+        let broker = Broker::from_registry().await.unwrap();
+        let performance_actor = PerformanceActor::of(broker.clone());
         let mut addr = performance_actor.start().await.unwrap();
 
         let ticker = Ticker(String::from("test"));
@@ -143,6 +85,7 @@ mod tests {
         let expected = PerformanceIndicators {
             ticker: ticker.clone(),
             time,
+            current_price: Some(Price(7.5f64)),
             min: Some(Price(2f64)),
             max: Some(Price(15f64)),
             n_window_sma: Some(Price(4.75f64)),

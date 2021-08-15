@@ -1,7 +1,7 @@
-use lib::ticker::Ticker;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use clap::{App, Arg};
+use lib::ticker::Ticker;
 use std::fs::read_to_string;
 use thiserror::Error;
 
@@ -21,6 +21,7 @@ pub enum ArgumentParsingError {
 pub struct Config {
     pub tickers: Vec<Ticker>,
     pub from: DateTime<Utc>,
+    pub file: Option<String>,
 }
 
 impl Config {
@@ -50,6 +51,13 @@ impl Config {
                     .value_name("FROM")
                     .help("Start date to load data from"),
             )
+            .arg(
+                Arg::with_name("file")
+                    .short("o")
+                    .long("output")
+                    .value_name("FILE")
+                    .help("File to output CSV data to"),
+            )
             .get_matches();
 
         let tickers: Vec<Ticker> = match (
@@ -76,8 +84,13 @@ impl Config {
             .value_of("from")
             .ok_or(ArgumentParsingError::MissingParameter("From"))?;
         let from = DateTime::parse_from_rfc3339(from_value)?.with_timezone(&Utc);
+        let file = arg_matcher.value_of("file").map(|x| x.to_owned());
 
-        let config = Config { tickers, from };
+        let config = Config {
+            tickers,
+            from,
+            file,
+        };
         Ok(config)
     }
 }

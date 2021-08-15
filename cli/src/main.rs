@@ -1,32 +1,65 @@
+use crate::actors::{
+    messages::{Fetch, PerformanceIndicators},
+    FetchActor, InMemoryQuoteWriter, OutputActor, PerformanceActor,
+};
 use anyhow::Result;
-use xactor::Actor;
+use bounded_vec_deque::BoundedVecDeque;
+use std::{
+    fs::File,
+    io::{BufWriter, Write},
+    sync::{Arc, RwLock},
+};
+use xactor::{Addr, Broker, Service, Supervisor};
 mod actors;
+mod api;
 mod config;
+mod read_optimised_circular_buffer;
 
+static MAX_API_BUFFER_SIZE: usize = 1023;
 #[async_std::main]
 async fn main() -> Result<()> {
     env_logger::init();
     let config = config::Config::new()?;
 
-    let output_actor = actors::output_actor::OutputActor::of(std::io::stdout());
-    let output_actor_addr = output_actor.start().await?;
+    let pth = config.file.clone();
+    let output_actor_addr = Supervisor::start(move || {
+        let writer: Box<dyn Write + Send> = match &pth {
+            Some(pth) => File::create(pth).map(BufWriter::new).map(Box::new).unwrap(),
+            None => Box::new(std::io::stdout()),
+        };
+        let output_actor: OutputActor<_, PerformanceIndicators> = OutputActor::of(writer);
+        output_actor
+    })
+    .await?;
 
-    let performance_actor =
-        actors::performance_actor::PerformanceActor::of(output_actor_addr.clone());
-    let performance_actor_addr = performance_actor.start().await?;
+    let read_optimised_in_memory_store =
+        Arc::new(RwLock::new(BoundedVecDeque::new(MAX_API_BUFFER_SIZE)));
 
-    let provider = yahoo_finance_api::YahooConnector::new();
-    let fetch_actor = actors::fetch_actor::FetchActor::of(
-        performance_actor_addr,
-        provider,
-        config.tickers,
-        config.from,
-    );
-    let fetch_actor_addr = fetch_actor.start().await?;
+    let route = api::get_n_indicators(read_optimised_in_memory_store.clone());
 
-    fetch_actor_addr
-        .call(actors::fetch_actor::Fetch::new())
-        .await?;
+    let _deque_actor_addr =
+        Supervisor::start(move || InMemoryQuoteWriter::of(read_optimised_in_memory_store.clone()))
+            .await?;
+
+    let broker = Broker::from_registry().await?;
+
+    let performance_actor_addr =
+        Supervisor::start(move || PerformanceActor::of(broker.clone())).await?;
+
+    let fetch_actor_addr = Supervisor::start(move || {
+        let provider = yahoo_finance_api::YahooConnector::new();
+        FetchActor::of(
+            performance_actor_addr.clone(),
+            provider,
+            config.tickers.clone(),
+            config.from,
+        )
+    })
+    .await?;
+
+    fetch_actor_addr.call(Fetch::new()).await?;
+
+    warp::serve(route).run(([127, 0, 0, 1], 3030)).await;
     output_actor_addr.wait_for_stop().await;
     Ok(())
 }
