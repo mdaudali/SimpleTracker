@@ -17,7 +17,7 @@ pub struct OutputActor<W: Write, T: Serialize + Message<Result = ()>> {
 }
 
 impl<W: Write, T: Serialize + Message<Result = ()>> OutputActor<W, T> {
-    pub fn of(writer: W) -> Self {
+    pub fn new(writer: W) -> Self {
         OutputActor {
             csv_writer: csv::Writer::from_writer(writer),
             _phantom: PhantomData,
@@ -107,7 +107,7 @@ mod tests {
         let buffer = Arc::new(Mutex::new(vec![]));
         let flush = Arc::new(Mutex::new(0));
         let mock_writer: MockWriter = MockWriter::new(buffer.clone(), flush);
-        let output_actor = OutputActor::of(mock_writer);
+        let output_actor = OutputActor::new(mock_writer);
 
         let mock_serializable = MockSerializable {
             test: "test".to_owned(),
@@ -129,7 +129,7 @@ mod tests {
         let buffer = Arc::new(Mutex::new(vec![]));
         let flush = Arc::new(Mutex::new(0));
         let mock_writer: MockWriter = MockWriter::new(buffer.clone(), flush.clone());
-        let output_actor: OutputActor<_, MockSerializable> = OutputActor::of(mock_writer);
+        let output_actor: OutputActor<_, MockSerializable> = OutputActor::new(mock_writer);
 
         let mut addr = output_actor.start().await.unwrap();
         addr.call(Flush).await.unwrap();
@@ -144,7 +144,7 @@ mod tests {
         let buffer = Arc::new(Mutex::new(vec![]));
         let flush = Arc::new(Mutex::new(0));
         let mock_writer: MockWriter = MockWriter::new(buffer.clone(), flush);
-        let output_actor = OutputActor::of(mock_writer);
+        let output_actor = OutputActor::new(mock_writer);
 
         let mock_serializable_one = MockSerializable {
             test: "test".to_owned(),

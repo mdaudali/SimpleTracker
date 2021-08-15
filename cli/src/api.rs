@@ -36,7 +36,7 @@ mod handlers {
     ) -> impl warp::Reply {
         let reader = buf.read().unwrap();
         warp::reply::json(&Indicators::new(
-            reader.iter().take(n).map(|x| x.clone()).collect(),
+            reader.iter().take(n).cloned().collect(),
         ))
     }
 }

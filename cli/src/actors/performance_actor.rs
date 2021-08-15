@@ -9,7 +9,7 @@ pub struct PerformanceActor {
 }
 
 impl PerformanceActor {
-    pub fn of(addr: Addr<Broker<PerformanceIndicators>>) -> Self {
+    pub fn new(addr: Addr<Broker<PerformanceIndicators>>) -> Self {
         PerformanceActor { addr }
     }
 }
@@ -18,7 +18,7 @@ impl Actor for PerformanceActor {}
 #[async_trait]
 impl Handler<PerformanceData> for PerformanceActor {
     async fn handle(&mut self, _ctx: &mut Context<Self>, msg: PerformanceData) -> () {
-        let performance_indicators = PerformanceIndicators::create(
+        let performance_indicators = PerformanceIndicators::new(
             msg.window(),
             msg.performance_data(),
             msg.ticker().clone(),
@@ -46,7 +46,7 @@ mod tests {
     }
 
     impl MockOutputActor {
-        fn of(buf: Arc<Mutex<Vec<PerformanceIndicators>>>) -> Self {
+        fn new(buf: Arc<Mutex<Vec<PerformanceIndicators>>>) -> Self {
             MockOutputActor {
                 received_messages: buf,
             }
@@ -72,14 +72,14 @@ mod tests {
     #[async_std::test]
     async fn performance_actor_messages_with_performance_indicators_when_series_is_not_empty() {
         let buffer = Arc::new(Mutex::new(vec![]));
-        let mock_actor = MockOutputActor::of(buffer.clone());
+        let mock_actor = MockOutputActor::new(buffer.clone());
         let mut mock_actor_addr = mock_actor.start().await.unwrap();
 
         let broker = Broker::from_registry().await.unwrap();
-        let performance_actor = PerformanceActor::of(broker.clone());
+        let performance_actor = PerformanceActor::new(broker.clone());
         let mut addr = performance_actor.start().await.unwrap();
 
-        let ticker = Ticker(String::from("test"));
+        let ticker = Ticker::new(String::from("test"));
         let series = [15f64, 13f64, 2f64, 7.5f64];
         let time = Utc::now();
         let expected = PerformanceIndicators {

@@ -9,7 +9,7 @@ use std::{
     io::{BufWriter, Write},
     sync::{Arc, RwLock},
 };
-use xactor::{Addr, Broker, Service, Supervisor};
+use xactor::{Broker, Service, Supervisor};
 mod actors;
 mod api;
 mod config;
@@ -27,7 +27,7 @@ async fn main() -> Result<()> {
             Some(pth) => File::create(pth).map(BufWriter::new).map(Box::new).unwrap(),
             None => Box::new(std::io::stdout()),
         };
-        let output_actor: OutputActor<_, PerformanceIndicators> = OutputActor::of(writer);
+        let output_actor: OutputActor<_, PerformanceIndicators> = OutputActor::new(writer);
         output_actor
     })
     .await?;
@@ -38,17 +38,17 @@ async fn main() -> Result<()> {
     let route = api::get_n_indicators(read_optimised_in_memory_store.clone());
 
     let _deque_actor_addr =
-        Supervisor::start(move || InMemoryQuoteWriter::of(read_optimised_in_memory_store.clone()))
+        Supervisor::start(move || InMemoryQuoteWriter::new(read_optimised_in_memory_store.clone()))
             .await?;
 
     let broker = Broker::from_registry().await?;
 
     let performance_actor_addr =
-        Supervisor::start(move || PerformanceActor::of(broker.clone())).await?;
+        Supervisor::start(move || PerformanceActor::new(broker.clone())).await?;
 
     let fetch_actor_addr = Supervisor::start(move || {
         let provider = yahoo_finance_api::YahooConnector::new();
-        FetchActor::of(
+        FetchActor::new(
             performance_actor_addr.clone(),
             provider,
             config.tickers.clone(),

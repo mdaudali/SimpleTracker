@@ -17,7 +17,7 @@ pub struct FetchActor<T: YahooFinanceApi, H: Handler<PerformanceData>> {
 }
 
 impl<T: YahooFinanceApi, H: Handler<PerformanceData>> FetchActor<T, H> {
-    pub fn of(sender: Addr<H>, yahoo_api: T, tickers: Vec<Ticker>, from: DateTime<Utc>) -> Self {
+    pub fn new(sender: Addr<H>, yahoo_api: T, tickers: Vec<Ticker>, from: DateTime<Utc>) -> Self {
         FetchActor {
             sender,
             yahoo_api,
@@ -44,12 +44,12 @@ impl<T: YahooFinanceApi + Send + Sync + 'static, H: Handler<PerformanceData>> Ha
     async fn handle(&mut self, _ctx: &mut Context<Self>, msg: Fetch) -> () {
         let provider = &self.yahoo_api;
         let from = self.from;
-        let to = msg.to();
+        let until = msg.until();
         let sender = &self.sender;
         stream::iter(self.tickers.clone())
             .for_each_concurrent(None, |ticker| async move {
                 let quotes = match provider
-                    .get_quote_history(&ticker.0, from, to)
+                    .get_quote_history(ticker.as_str(), from, until)
                     .await
                     .and_then(|x| x.quotes())
                 {
@@ -60,7 +60,7 @@ impl<T: YahooFinanceApi + Send + Sync + 'static, H: Handler<PerformanceData>> Ha
                     Ok(o) => o,
                 };
                 let series: Vec<f64> = quotes.iter().map(|q| q.adjclose).collect();
-                let performance_data = PerformanceData::of(ticker, 30, series, to);
+                let performance_data = PerformanceData::new(ticker, 30, series, until);
                 if let Err(e) = sender.send(performance_data) {
                     error!("Failed to send quotes to actor: {:?}", e)
                 }
@@ -109,7 +109,7 @@ mod tests {
     }
 
     impl MockPerformanceDataActor {
-        fn of(buf: Arc<Mutex<Vec<PerformanceData>>>) -> Self {
+        fn new(buf: Arc<Mutex<Vec<PerformanceData>>>) -> Self {
             MockPerformanceDataActor { buf }
         }
     }
@@ -150,12 +150,12 @@ mod tests {
         fetch: Fetch,
     ) -> Vec<PerformanceData> {
         let buf = Arc::new(Mutex::new(vec![]));
-        let mock_performance_data_actor = MockPerformanceDataActor::of(buf.clone());
+        let mock_performance_data_actor = MockPerformanceDataActor::new(buf.clone());
         let mut mock_performance_data_actor_addr =
             mock_performance_data_actor.start().await.unwrap();
 
         let mock_yahoo_api = MockYahooConnector;
-        let fetch_actor = FetchActor::of(
+        let fetch_actor = FetchActor::new(
             mock_performance_data_actor_addr.clone(),
             mock_yahoo_api,
             tickers,
@@ -178,21 +178,21 @@ mod tests {
     async fn fetch_actor_returns_quotes_from_initial_time_to_now() {
         let now = Utc::now();
         let sent_messages = create_buf_and_actors_and_call_actor_with(
-            vec![Ticker("test".to_string())],
-            Fetch::of(now),
+            vec![Ticker::new("test".to_string())],
+            Fetch::from_datetime(now),
         )
         .await;
         let message = sent_messages.into_iter().nth(0).unwrap();
 
         let expected =
-            PerformanceData::of(Ticker("test".to_string()), 30, vec![1f64, 2f64, 3f64], now);
+            PerformanceData::new(Ticker::new("test".to_string()), 30, vec![1f64, 2f64, 3f64], now);
         assert_eq!(message, expected);
     }
 
     #[async_std::test]
     async fn fetch_actor_retrieves_multiple_tickers() {
         let sent_messages = create_buf_and_actors_and_call_actor_with(
-            vec![Ticker("test".to_string()), Ticker("other_test".to_string())],
+            vec![Ticker::new("test".to_string()), Ticker::new("other_test".to_string())],
             Fetch::new(),
         )
         .await;

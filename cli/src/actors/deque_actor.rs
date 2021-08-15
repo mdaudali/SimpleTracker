@@ -25,7 +25,7 @@ impl Handler<PerformanceIndicators> for InMemoryQuoteWriter {
 }
 
 impl InMemoryQuoteWriter {
-    pub fn of(store: ReadOptimisedCircularBuffer<PerformanceIndicators>) -> Self {
+    pub fn new(store: ReadOptimisedCircularBuffer<PerformanceIndicators>) -> Self {
         InMemoryQuoteWriter { store }
     }
 }
@@ -43,9 +43,9 @@ mod tests {
     #[async_std::test]
     async fn in_memory_quote_writer_writes_data() {
         let store = Arc::new(RwLock::new(BoundedVecDeque::new(1)));
-        let actor = InMemoryQuoteWriter::of(store.clone());
+        let actor = InMemoryQuoteWriter::new(store.clone());
         let mut actor_addr = actor.start().await.unwrap();
-        let s = PerformanceIndicators::create(20, vec![], Ticker("test".to_owned()), Utc::now());
+        let s = PerformanceIndicators::new(20, vec![], Ticker::new("test".to_owned()), Utc::now());
         actor_addr.call(s.clone()).await.unwrap();
         actor_addr.stop(None).unwrap();
         actor_addr.wait_for_stop().await;

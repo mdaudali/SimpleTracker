@@ -2,9 +2,8 @@ use chrono::prelude::*;
 use lib::formatter::{Percentage, Price};
 use lib::performance_indicators::*;
 use lib::ticker::Ticker;
-use log::error;
 use serde::Serialize;
-use xactor::{message, Actor, Addr, Broker, Context, Handler};
+use xactor::message;
 
 #[message]
 #[derive(Clone, PartialEq, Debug)]
@@ -16,7 +15,7 @@ pub struct PerformanceData {
 }
 
 impl PerformanceData {
-    pub fn of(
+    pub fn new(
         ticker: Ticker,
         window: usize,
         performance_data: Vec<f64>,
@@ -61,7 +60,7 @@ pub struct PerformanceIndicators {
 }
 
 impl PerformanceIndicators {
-    pub fn create(
+    pub fn new(
         window: usize,
         series: &[f64],
         ticker: Ticker,
@@ -77,7 +76,7 @@ impl PerformanceIndicators {
         PerformanceIndicators {
             ticker,
             time,
-            current_price: series.last().map(|x| Price(x.clone())),
+            current_price: series.last().map(|x| Price(*x)),
             min: min(series).map(Price),
             max: max(series).map(Price),
             n_window_sma: n_window_sma(window, series)
@@ -91,19 +90,26 @@ impl PerformanceIndicators {
 #[message]
 #[derive(Clone)]
 pub struct Fetch {
-    to: DateTime<Utc>,
+    until: DateTime<Utc>,
 }
 
 impl Fetch {
     pub fn new() -> Self {
-        Fetch::of(Utc::now())
+        Fetch::from_datetime(Utc::now())
     }
 
-    pub fn of(to: DateTime<Utc>) -> Self {
-        Fetch { to }
+    pub fn from_datetime(until: DateTime<Utc>) -> Self {
+        Fetch {
+            until
+        }
     }
+    pub fn until(&self) -> DateTime<Utc> {
+        self.until
+    }
+}
 
-    pub fn to(&self) -> DateTime<Utc> {
-        self.to
+impl Default for Fetch {
+    fn default() -> Self {
+        Fetch::new()
     }
 }
